@@ -297,10 +297,175 @@ async function loadAll() {
     news = data.news || [];
     console.log("Loaded from backend:", data);
 
-    // TODO: after loading, update your UI with accounts/trades/news
+// Update UI with fresh data
+renderAccounts();
+renderTrades();
+renderNews();
+
+  } catch (err) {
+    console.error("Error loading data:", err);
+  }<!-- ... keep your full HTML and CSS the same ... -->
+
+<script>
+/* ========= App Data ========= */
+let accounts = [];
+let trades = [];
+let news = [];
+
+// Backend API URL
+const API_URL = '/.netlify/functions/save';
+
+// Load everything from backend
+async function loadAll() {
+  try {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+    accounts = data.accounts || [];
+    trades = data.trades || [];
+    news = data.news || [];
+
+    // Update UI
+    renderAccounts();
+    renderTrades();
+    renderNews();
   } catch (err) {
     console.error("Error loading data:", err);
   }
+}
+
+// Save everything to backend
+async function saveAll() {
+  try {
+    const data = { accounts, trades, news };
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch (err) {
+    console.error("Error saving data:", err);
+  }
+}
+
+// Load data on page startup
+loadAll();
+
+/* ========= Accounts ========= */
+function addAccount(){
+  const name = document.getElementById('newAccountName').value.trim();
+  const start = Number(document.getElementById('newAccountStart').value || 0);
+  if(!name) return alert('Enter account name');
+  accounts.push({ id: uid('acc_'), name, startBalance: start, createdAt: new Date().toISOString() });
+  saveAll();
+  document.getElementById('newAccountName').value='';
+  document.getElementById('newAccountStart').value='';
+  populateTradeAccounts(); renderAccounts(); renderDashboard(); populateReportAccounts(); ensureJournalFilter(); renderJournal(true);
+}
+function editAccount(id){
+  const a = accounts.find(x=>x.id===id);
+  if(!a) return;
+  const newName = prompt('Account name', a.name);
+  if(newName) a.name = newName;
+  saveAll(); populateTradeAccounts(); renderAccounts(); renderDashboard(); ensureJournalFilter(); renderJournal(true); populateReportAccounts();
+}
+function deleteAccount(id){
+  if(!confirm('Delete this account and its trades?')) return;
+  accounts = accounts.filter(x=>x.id!==id);
+  trades = trades.filter(t=>t.accountId!==id);
+  saveAll(); populateTradeAccounts(); renderAccounts(); renderDashboard(); ensureJournalFilter(); renderJournal(true); populateReportAccounts();
+}
+
+/* ========= Trades ========= */
+document.getElementById('tradeForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const accId = document.getElementById('tradeAccount').value;
+  if(!accId) return alert('Select an account');
+
+  const entryISO = document.getElementById('entryTime').value || new Date().toISOString().slice(0,16);
+  const tData = {
+    accountId: accId,
+    pair: document.getElementById('pair').value.trim(),
+    entryTime: entryISO,
+    exitTime: document.getElementById('exitTime').value || '',
+    side: document.getElementById('side').value,
+    tradeType: document.getElementById('tradeType').value,
+    confluences: document.getElementById('confluences').value.trim(),
+    strategy: document.getElementById('strategy').value.trim(),
+    narrative: document.getElementById('narrative').value.trim(),
+    mistakes: document.getElementById('mistakes').value.trim(),
+    psychology: document.getElementById('psychology').value.trim(),
+    rr: document.getElementById('rr').value.trim(),
+    pl: Number(document.getElementById('pl').value || 0),
+    result: document.getElementById('result').value,
+    screenshots: currentShots.slice(),
+    screenshot: currentShots[0] || '',
+  };
+
+  if(editingTradeId){
+    const tr = trades.find(x=>x.id===editingTradeId);
+    if(!tr) return alert('Trade not found');
+    Object.assign(tr, tData);
+    saveAll();
+    editingTradeId = null;
+    document.getElementById('saveBtn').textContent = 'Save Trade';
+    alert('Trade updated.');
+  } else {
+    const t = { id: uid('tr_'), createdAt: new Date().toISOString(), ...tData };
+    trades.push(t);
+    saveAll();
+    alert('Saved trade.');
+  }
+
+  e.target.reset();
+  initDropzone([]);
+  renderDashboard();
+  ensureJournalFilter();
+  renderJournal(true);
+  renderScreenshotsByDay();
+});
+function deleteTrade(id){
+  if(!confirm('Delete trade?')) return;
+  trades = trades.filter(t=>t.id!==id);
+  saveAll();
+  ensureJournalFilter();
+  renderJournal(true);
+  renderDashboard();
+  renderScreenshotsByDay();
+}
+
+/* ========= News ========= */
+document.getElementById('newsForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const d = document.getElementById('newsDate').value || new Date().toISOString().slice(0,10);
+  const txt = document.getElementById('newsText').value.trim();
+  let img = '';
+  const file = document.getElementById('newsImg').files[0];
+  if(file) img = await toBase64(file);
+  news.push({ id: uid('nw_'), date: d, text: txt, img });
+  saveAll(); // <-- added here
+  document.getElementById('newsForm').reset(); 
+  renderNews();
+});
+function deleteNews(id){ 
+  news = news.filter(n=>n.id!==id); 
+  saveAll(); 
+  renderNews(); 
+}
+
+/* ========= Init ========= */
+(function init(){
+  populateTradeAccounts();
+  ensureJournalFilter();
+  renderAccounts();
+  renderDashboard();
+  renderJournal(true);
+  renderNews();
+  renderScreenshotsByDay();
+  populateReportAccounts();
+  initDropzone([]);
+})();
+</script>
+
 }
 
 // Save everything to backend
