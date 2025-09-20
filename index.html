@@ -279,17 +279,48 @@ const STORAGE_KEYS = {
   TRADES: 'aj_trades_v2',   // bump version to avoid conflicts with older structure
   NEWS: 'aj_news_v1'
 };
-let accounts = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACCOUNTS) || '[]');
-let trades = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRADES) || '[]');
-let news = JSON.parse(localStorage.getItem(STORAGE_KEYS.NEWS) || '[]');
+/* ========= App Data ========= */
+let accounts = [];
+let trades = [];
+let news = [];
 
-/* ======== Helper Utils ======== */
-function uid(prefix='id'){ return prefix + Date.now() + Math.floor(Math.random()*9999); }
-function saveAll(){
-  localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(accounts));
-  localStorage.setItem(STORAGE_KEYS.TRADES, JSON.stringify(trades));
-  localStorage.setItem(STORAGE_KEYS.NEWS, JSON.stringify(news));
+// Backend API URL
+const API_URL = '/.netlify/functions/save';
+
+// Load everything from backend
+async function loadAll() {
+  try {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+    accounts = data.accounts || [];
+    trades = data.trades || [];
+    news = data.news || [];
+    console.log("Loaded from backend:", data);
+
+    // TODO: after loading, update your UI with accounts/trades/news
+  } catch (err) {
+    console.error("Error loading data:", err);
+  }
 }
+
+// Save everything to backend
+async function saveAll() {
+  try {
+    const data = { accounts, trades, news };
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    console.log("Saved to backend");
+  } catch (err) {
+    console.error("Error saving data:", err);
+  }
+}
+
+// Load data on page startup
+loadAll();
+
 function formatDateTime(d){
   if(!d) return '';
   const dt = new Date(d);
